@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     argParser.add_argument('-k', dest='key',
                            help='Country code in lower case', type=str,
-                           default='91ee99a3-19cc-49d2-b5c4-a318163f68af')
+                           default='xxxxxx-xxxxxx-xxxxxxxx-xxxxxxxxxx')
 
     argParser.add_argument('-p', dest='pingmsmfile',
                            help='''File where ping measurement ids
