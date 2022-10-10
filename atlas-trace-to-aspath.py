@@ -37,8 +37,8 @@ from ipwhois import IPWhois
 from collections import OrderedDict
 from itertools import repeat
 
-caida_prefix2as = "https://publicdata.caida.org/datasets/routing/routeviews-prefix2as/2022/08/routeviews-rv2-20220827-0200.pfx2as.gz"
-
+caida_prefix2as = "https://publicdata.caida.org/datasets/routing/routeviews-prefix2as/2022/09/routeviews-rv2-20220917-1200.pfx2as.gz"
+                       
 
 def getResults(measurement_id):
     base_url = "https://atlas.ripe.net/api/v2/measurements/"
@@ -56,6 +56,15 @@ def getProbeInfo(probe_id):
     resp = requests.get(url)
     data = resp.json()
     return data
+
+
+def getMsmTarget(measurement_id):
+    base_url = "https://atlas.ripe.net/api/v2/measurements/"
+    url = base_url+str(measurement_id)+"/"
+    resp = requests.get(url)
+    data = resp.json()
+    target = data["target_ip"]
+    return target
 
 
 if __name__ == "__main__":
@@ -109,7 +118,21 @@ if __name__ == "__main__":
     with open(args.tracemsmfile, 'r') as tracejson:
         trace_msms = json.load(tracejson)
 
+    
     validtraceresults = []
+    prov_msm_probes = {}
+
+    for msm in trace_msms:
+        results = getResults(msm) 
+        target = getMsmTarget(msm)
+
+        if target == "162.254.197.36":
+
+            if 'Valve' not provider_probes_trace:
+                prov_msm_probes['Valve'] = []
+            prbs_by_msm = {} 
+            
+
 
     for msm in trace_msms:
         results = getResults(msm)
