@@ -33,6 +33,21 @@ import matplotlib.mlab as mlab
 from networkx import path_graph, random_layout
 from pyvis.network import Network
 import random
+import csv
+
+
+def seperateEdgesASRelData(graph):
+    p2c_edges = []
+    p2p_edges = []
+    for edge in list(graph.edges):
+        rel = graph.get_edge_data(edge[0],edge[1])
+        #print("Attribute rel is %s\n" %rel) 
+        if rel['relationship'] == 'p2c':
+            p2c_edges.append(edge)
+
+        if rel['relationship'] == 'p2p':
+            p2p_edges.append(edge)
+    return p2c_edges, p2p_edges
 
 
 def pyvisualise(graph, asn):
@@ -52,6 +67,45 @@ def pyvisualise(graph, asn):
         node["title"] = "ASN"+str(node['id'])+"'s Neighbors:\n\n" + "\n".join(new_map[node["id"]])
         node["label"] = str(node['id'])
     net.show('/scratch/measurements/analysis/Probe-And-ASpaths/pyvisualisation/'+str(asn)+'.html')
+
+
+def readASRelData(ASRelDataFile):
+    with open(ASRelDataFile, 'r') as f:
+        try:
+            ASRelData = csv.reader(f, delimiter='\t')
+            graph = createGraph(ASRelData)
+        except IndexError:
+            ASRelData = csv.reader(f, delimiter='|')
+            graph = createGraph(ASRelData)
+        
+    return graph
+
+
+def createGraph(ASRelData):
+    internetGraph = nx.DiGraph()
+    for asRelLink in ASRelData:
+        if asRelLink[2] != 'unknown':
+            if (asRelLink[2] == 'p2c') or (asRelLink[2] == '-1'):
+                internetGraph.add_edge(int(asRelLink[0]), int(asRelLink[1]),
+                                       relationship='p2c')
+
+            if (asRelLink[2] == 'c2p'):
+                internetGraph.add_edge(int(asRelLink[1]), int(asRelLink[0]),
+                                       relationship='p2c')
+
+            if (asRelLink[2] == 'p2p') or (asRelLink[2] == '0'):
+                internetGraph.add_edge(int(asRelLink[0]), int(asRelLink[1]),
+                                       relationship='p2p')
+                internetGraph.add_edge(int(asRelLink[1]), int(asRelLink[0]),
+                                       relationship='p2p')
+        else:
+            internetGraph.add_edge(int(asRelLink[0]), int(asRelLink[1]),
+                                   relationship='p2p')
+            internetGraph.add_edge(int(asRelLink[1]), int(asRelLink[0]),
+                                   relationship='p2p')
+
+    #return internetGraph
+    return internetGraph.reverse()
 
 
 def seperateEdges(graph):
@@ -244,12 +298,14 @@ if __name__ == "__main__":
     valve_aspaths_from_prb = aspath2prb_valid['Valve']
     ubisoft_aspaths_from_prb = aspath2prb_valid['Ubisoft']
     blizzard_aspaths_from_prb = aspath2prb_valid['Blizzard']
-
+    #penultimate_asn = set()
     prb_asns_valve = {}
     for prb in valve_aspaths_from_prb:
         (prb_id, aspaths), = prb.items()
         for aspath in aspaths:
             origin_asn = aspath[0]
+            #if isinstance(aspath[-2], int):
+            #    penultimate_asn.add(aspath[-2])
             if origin_asn not in prb_asns_valve:
                 prb_asns_valve[origin_asn] = [prb_id]
             else: 
@@ -260,6 +316,8 @@ if __name__ == "__main__":
     for prb in ubisoft_aspaths_from_prb:
         (prb_id, aspaths), = prb.items()
         for aspath in aspaths:
+            #if isinstance(aspath[-2], int):
+            #    penultimate_asn.add(aspath[-2])
             origin_asn = aspath[0]
             if origin_asn not in prb_asns_ubisoft:
                 prb_asns_ubisoft[origin_asn] = [prb_id]
@@ -272,6 +330,8 @@ if __name__ == "__main__":
         (prb_id, aspaths), = prb.items()
         for aspath in aspaths:
             origin_asn = aspath[0]
+            #if isinstance(aspath[-2], int):
+            #    penultimate_asn.add(aspath[-2])
             if origin_asn not in prb_asns_blizzard:
                 prb_asns_blizzard[origin_asn] = [prb_id]
             else:
@@ -396,6 +456,8 @@ if __name__ == "__main__":
     pathasn = set()
     graph = nx.DiGraph()
     penultimate_asn = set()
+    validPenultimateASNs = [1299, 3356, 6939]
+    asnProbesForPenultimateASNs = {}
     for asn, probes in asn_of_common_valid_probes.items():
         for probe in probes:
             for prb in blizzard_aspaths_from_prb:
@@ -411,14 +473,20 @@ if __name__ == "__main__":
                     for str_e in str_elem:
                         aspath.remove(str_e)
                     graph.add_nodes_from(aspath)
-                    for asn in aspath:
-                        pathasn.add(asn)
-                        index = aspath.index(asn)
+                    for asname in aspath:
+                        pathasn.add(asname)
+                        index = aspath.index(asname)
                         if index == (len(aspath) - 2):
-                            penultimate_asn.add(asn)
+                            penultimate_asn.add(asname)
+                            if asname in validPenultimateASNs:
+                                if asname not in asnProbesForPenultimateASNs:
+                                    asnProbesForPenultimateASNs[asn] = [prb_id]
+                                else:
+                                    if prb_id not in asnProbesForPenultimateASNs[asn]:
+                                        asnProbesForPenultimateASNs[asn].append(prb_id)
                         next_id = index + 1
                         if next_id != len(aspath):
-                            graph.add_edge(asn, aspath[next_id], color='blue')
+                            graph.add_edge(asname, aspath[next_id], color='blue')
 
 
             for prb in valve_aspaths_from_prb:
@@ -434,14 +502,20 @@ if __name__ == "__main__":
                     for str_e in str_elem:
                         aspath.remove(str_e)
                     graph.add_nodes_from(aspath)
-                    for asn in aspath:
-                        pathasn.add(asn)
-                        index = aspath.index(asn)
+                    for asname in aspath:
+                        pathasn.add(asname)
+                        index = aspath.index(asname)
                         if index == (len(aspath) - 2):
-                            penultimate_asn.add(asn)
+                            penultimate_asn.add(asname)
+                            if asname in validPenultimateASNs:
+                                if asn not in asnProbesForPenultimateASNs:
+                                    asnProbesForPenultimateASNs[asn] = [prb_id]
+                                else:
+                                    if prb_id not in asnProbesForPenultimateASNs[asn]:
+                                        asnProbesForPenultimateASNs[asn].append(prb_id)
                         next_id = index + 1
                         if next_id != len(aspath):
-                            graph.add_edge(asn, aspath[next_id], color='red')
+                            graph.add_edge(asname, aspath[next_id], color='red')
 
             for prb in ubisoft_aspaths_from_prb:
                 (prb_id, aspaths), = prb.items()
@@ -456,14 +530,20 @@ if __name__ == "__main__":
                     for str_e in str_elem:
                         aspath.remove(str_e)
                     graph.add_nodes_from(aspath)
-                    for asn in aspath:
-                        pathasn.add(asn)
-                        index = aspath.index(asn)
+                    for asname in aspath:
+                        pathasn.add(asname)
+                        index = aspath.index(asname)
                         if index == (len(aspath) - 2):
-                            penultimate_asn.add(asn)
+                            penultimate_asn.add(asname)
+                            if asname in validPenultimateASNs:
+                                if asn not in asnProbesForPenultimateASNs:
+                                    asnProbesForPenultimateASNs[asn] = [prb_id]
+                                else:
+                                    if prb_id not in asnProbesForPenultimateASNs[asn]:
+                                        asnProbesForPenultimateASNs[asn].append(prb_id)
                         next_id = index + 1
                         if next_id != len(aspath):
-                            graph.add_edge(asn, aspath[next_id], color='green')
+                            graph.add_edge(asname, aspath[next_id], color='green')
         #drawTopoGraph(graph)
     common_asn_probes_paths = {}
     asns_with_disjoint_paths = [3352, 12302, 13046, 15735, 20912, 24921, 34410, 34643, 48747,
@@ -571,9 +651,83 @@ if __name__ == "__main__":
 
     pprint(common_asn_probes_paths)
     print("Numer of asns with disjoint paths to the game servers: %s" % len(asns_with_disjoint_paths))
-    with open('/scratch/measurements/aspath/probes-asn-paths-to-server/list-of-asns-and-probes-common-to-msms-to-the-three-game-servers-and-their-paths.json', 'w', encoding='utf-8') as f:
-        json.dump(common_asn_probes_paths, f, ensure_ascii=False, indent=4)
-    #print("Number of all penultimate ASNs before game server ASNs: %s" % len(penultimate_asn))
+    #with open('/scratch/measurements/aspath/probes-asn-paths-to-server/list-of-asns-and-probes-common-to-msms-to-the-three-game-servers-and-their-paths.json', 'w', encoding='utf-8') as f:
+     #   json.dump(common_asn_probes_paths, f, ensure_ascii=False, indent=4)
+    print("Number of all penultimate ASNs before game server ASNs: %s" % len(penultimate_asn))
+    gameServerAsns = {57976, 32590, 49544}
+    commonPenultimateAsn = set()
+    for asn in penultimate_asn:
+    
+        successors = set(list(graph.successors(asn)))
+        intersect = successors.intersection(gameServerAsns)
+        if len(intersect) > 1:
+            commonPenultimateAsn.add(asn)
+
+        #check = all(elem in successors for elem in gameServerAsns)
+        #if check:
+            #print("ASN%s is connected to at least two game servers" %asn)
+            #print("Successors of Penultimate ASN%s are: %s" %(asn, successors))
+        #print("\n")
+    print("Number of penultimate ASNs that are neighbours of two or all of the game server: %s" %len(commonPenultimateAsn))
+    ASRelGraph = readASRelData("/scratch/20220901.as-rel2-filtered.txt")
+
+    all_edges = []
+    for edge in list(ASRelGraph.edges):
+        all_edges.append(edge)
+
+    for asn in commonPenultimateAsn:
+        i = 0
+
+        blizzard = (57976, asn)
+        ubisoft =  (49544, asn)
+        valve =   (32590, asn)
+        if blizzard in all_edges:
+            i += 1
+
+        if ubisoft in all_edges:
+            i += 1
+
+        if valve in all_edges:
+            i += 1
+
+        if i == 3:
+            print("ASN %s has edges with all three game servers" %asn)
+
+        if i == 2:
+            print("ASN %s has edges with just two game servers" %asn)
+
+
+    print("ASN and their probes that have 1299,3356 and 6969 as penultimate ASN to the game servers")
+    print("They are: %s" %asnProbesForPenultimateASNs)
+    with open('/scratch/measurements/aspath/probes-asn-paths-to-server/asn-and-probes-with-1299-3356-6969-in-the-paths.json', 'w', encoding='utf-8') as f:
+        json.dump(asnProbesForPenultimateASNs, f, ensure_ascii=False, indent=4)
+
+    #for asn in commonPenultimateAsn:
+    #    predecessors = set(list(ASRelGraph.predecessors(asn)))
+
+    #    #check = all(elem in predecessors for elem in gameServerAsns)
+    #    intersect = predecessors.intersection(gameServerAsns)
+    #    print("ASN %s:" %asn)
+    #    if len(intersect) > 1:
+    #        print("Validated with the AS relationship data:")
+    #        print("ASN %s is connected to the two or all game servers" %asn)
+    #        #print("Successors of Penultimate ASN%s are: %s" %(asn, successors))
+    #        print("\n")
+    #    else:
+    #        for serverASN in gameServerAsns:
+    #            if nx.has_path(ASRelGraph, serverASN, asn):
+    #                shortest_paths = nx.shortest_path(ASRelGraph, serverASN, asn)
+    #                print("Shortest paths between %s and %s" %(serverASN, asn))
+    #                for path in shortest_paths:
+    #                    print(path)
+    #            else:
+    #                print("No path between %s and %s" %(serverASN, asn))
+    #            print("\n")
+
+
+
+        #print("ASN%s Successors: %s" %(asn, successors))
+
     #for asn in penultimate_asn:
     #    print("To Blizzard ASN 57976")
     #    if nx.has_path(graph, asn, 57976):
@@ -616,12 +770,12 @@ if __name__ == "__main__":
         node["label"] = str(node['id'])
         #print("Node: %s" % node)
 
-    for edge in net_pyvis.get_edges():
-        lat = random.randint(1,100)
+    #for edge in net_pyvis.get_edges():
+    #    lat = random.randint(1,100)
 
-        edge["width"] = float((1/lat)*10) 
-        edge["title"] = str(lat)+' ms'
-        print(edge)
+    #    edge["width"] = float((1/lat)*10) 
+    #    edge["title"] = str(lat)+' ms'
+    #    #print(edge)
 
-    net_pyvis.show('nx_with_width.html')
+    #net_pyvis.show('nx_fixes_asname.html')
 
